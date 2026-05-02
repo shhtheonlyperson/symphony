@@ -22,7 +22,7 @@ agent:
   max_concurrent_agents: 2
   max_turns: 10
 codex:
-  command: codex app-server
+  command: codex app-server -c model=\"gpt-5.4-mini\" -c model_reasoning_effort=\"medium\"
   approval_policy: never
   thread_sandbox: workspace-write
 ---
