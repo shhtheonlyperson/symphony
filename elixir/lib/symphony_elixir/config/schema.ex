@@ -49,6 +49,7 @@ defmodule SymphonyElixir.Config.Schema do
       field(:endpoint, :string, default: "https://api.linear.app/graphql")
       field(:api_key, :string)
       field(:project_slug, :string)
+      field(:repo, :string)
       field(:assignee, :string)
       field(:active_states, {:array, :string}, default: ["Todo", "In Progress"])
       field(:terminal_states, {:array, :string}, default: ["Closed", "Cancelled", "Canceled", "Duplicate", "Done"])
@@ -59,7 +60,7 @@ defmodule SymphonyElixir.Config.Schema do
       schema
       |> cast(
         attrs,
-        [:kind, :endpoint, :api_key, :project_slug, :assignee, :active_states, :terminal_states],
+        [:kind, :endpoint, :api_key, :project_slug, :repo, :assignee, :active_states, :terminal_states],
         empty_values: []
       )
     end
@@ -366,10 +367,14 @@ defmodule SymphonyElixir.Config.Schema do
   end
 
   defp finalize_settings(settings) do
+    tracker_kind = settings.tracker.kind
+
     tracker = %{
       settings.tracker
-      | api_key: resolve_secret_setting(settings.tracker.api_key, System.get_env("LINEAR_API_KEY")),
-        assignee: resolve_secret_setting(settings.tracker.assignee, System.get_env("LINEAR_ASSIGNEE"))
+      | endpoint: resolve_tracker_endpoint(settings.tracker.endpoint, tracker_kind),
+        api_key: resolve_secret_setting(settings.tracker.api_key, default_tracker_api_key(tracker_kind)),
+        repo: resolve_secret_setting(settings.tracker.repo, default_tracker_repo(tracker_kind)),
+        assignee: resolve_secret_setting(settings.tracker.assignee, default_tracker_assignee(tracker_kind))
     }
 
     workspace = %{
@@ -385,6 +390,21 @@ defmodule SymphonyElixir.Config.Schema do
 
     %{settings | tracker: tracker, workspace: workspace, codex: codex}
   end
+
+  defp resolve_tracker_endpoint("https://api.linear.app/graphql", "github"), do: "https://api.github.com"
+  defp resolve_tracker_endpoint(endpoint, _tracker_kind), do: endpoint
+
+  defp default_tracker_api_key("github") do
+    System.get_env("GITHUB_TOKEN") || System.get_env("GH_TOKEN")
+  end
+
+  defp default_tracker_api_key(_tracker_kind), do: System.get_env("LINEAR_API_KEY")
+
+  defp default_tracker_repo("github"), do: System.get_env("GITHUB_REPOSITORY")
+  defp default_tracker_repo(_tracker_kind), do: nil
+
+  defp default_tracker_assignee("github"), do: System.get_env("GITHUB_ASSIGNEE")
+  defp default_tracker_assignee(_tracker_kind), do: System.get_env("LINEAR_ASSIGNEE")
 
   defp normalize_keys(value) when is_map(value) do
     Enum.reduce(value, %{}, fn {key, raw_value}, normalized ->
