@@ -10,26 +10,22 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
 }
 
-gh_cmd() {
-  env -u CODEX_CI op plugin run -- gh "$@"
-}
-
 ensure_label() {
   repo="$1"
   name="$2"
   color="$3"
   description="$4"
 
-  if gh_cmd label list --repo "$repo" --search "$name" --json name --jq '.[].name' | grep -Fx "$name" >/dev/null 2>&1; then
-    gh_cmd label edit --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
+  if gh label list --repo "$repo" --search "$name" --json name --jq '.[].name' | grep -Fx "$name" >/dev/null 2>&1; then
+    gh label edit --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
     printf 'updated label: %s\n' "$name"
   else
-    gh_cmd label create --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
+    gh label create --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
     printf 'created label: %s\n' "$name"
   fi
 }
 
-require_cmd op
+require_cmd gh
 
 repo="${GITHUB_REPOSITORY:-}"
 case "$repo" in
@@ -37,7 +33,7 @@ case "$repo" in
   *) die "set GITHUB_REPOSITORY=OWNER/REPO" ;;
 esac
 
-if ! gh_cmd repo view "$repo" --json nameWithOwner --jq .nameWithOwner >/dev/null; then
+if ! gh repo view "$repo" --json nameWithOwner --jq .nameWithOwner >/dev/null; then
   die "cannot access GitHub repo: $repo"
 fi
 
@@ -53,7 +49,7 @@ GitHub labels are ready for $repo.
 Start Symphony:
   cd $(pwd)
   export GITHUB_REPOSITORY=$repo
-  export GITHUB_TOKEN="\$(env -u CODEX_CI op plugin run -- gh auth token)"
+  export GITHUB_TOKEN="\$(gh auth token)"
   mise exec -- ./bin/symphony ./GITHUB_WORKFLOW.md --port 4040
 
 Open the dashboard:
