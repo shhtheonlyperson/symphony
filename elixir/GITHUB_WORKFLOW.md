@@ -23,6 +23,7 @@ agent:
   max_turns: 10
 codex:
   command: codex app-server
+  approval_policy: never
   thread_sandbox: workspace-write
 ---
 
