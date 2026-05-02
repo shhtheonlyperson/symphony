@@ -24,4 +24,6 @@ if [ -z "${GITHUB_TOKEN:-}" ]; then
 fi
 
 ./scripts/symphony-github-setup
-exec mise exec -- ./bin/symphony ./GITHUB_WORKFLOW.md --port "${SYMPHONY_PORT:-4040}"
+exec mise exec -- ./bin/symphony ./GITHUB_WORKFLOW.md \
+  --port "${SYMPHONY_PORT:-4040}" \
+  --i-understand-that-this-will-be-running-without-the-usual-guardrails
