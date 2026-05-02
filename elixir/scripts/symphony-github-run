@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+set -eu
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+repo="${GITHUB_REPOSITORY:-}"
+case "$repo" in
+  */*) ;;
+  *) die "set GITHUB_REPOSITORY=OWNER/REPO" ;;
+esac
+
+require_cmd gh
+require_cmd mise
+
+if [ -z "${GITHUB_TOKEN:-}" ]; then
+  export GITHUB_TOKEN="$(gh auth token)"
+fi
+
+./scripts/symphony-github-setup
+exec mise exec -- ./bin/symphony ./GITHUB_WORKFLOW.md --port "${SYMPHONY_PORT:-4040}"

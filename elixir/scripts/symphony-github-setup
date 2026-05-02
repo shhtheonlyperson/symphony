@@ -1,0 +1,57 @@
+#!/usr/bin/env sh
+set -eu
+
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+ensure_label() {
+  repo="$1"
+  name="$2"
+  color="$3"
+  description="$4"
+
+  if gh label list --repo "$repo" --search "$name" --json name --jq '.[].name' | grep -Fx "$name" >/dev/null 2>&1; then
+    gh label edit --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
+    printf 'updated label: %s\n' "$name"
+  else
+    gh label create --repo "$repo" "$name" --color "$color" --description "$description" >/dev/null
+    printf 'created label: %s\n' "$name"
+  fi
+}
+
+require_cmd gh
+
+repo="${GITHUB_REPOSITORY:-}"
+case "$repo" in
+  */*) ;;
+  *) die "set GITHUB_REPOSITORY=OWNER/REPO" ;;
+esac
+
+if ! gh repo view "$repo" --json nameWithOwner --jq .nameWithOwner >/dev/null; then
+  die "cannot access GitHub repo: $repo"
+fi
+
+ensure_label "$repo" "codex:ready" "2DA44E" "Ready for Symphony/Codex orchestration"
+ensure_label "$repo" "codex:running" "0969DA" "Currently being handled by Symphony/Codex"
+ensure_label "$repo" "codex:rework" "D97706" "Blocked or needs rework before completion"
+ensure_label "$repo" "codex:done" "8250DF" "Completed by Symphony/Codex"
+
+cat <<EOF
+
+GitHub labels are ready for $repo.
+
+Start Symphony:
+  cd $(pwd)
+  export GITHUB_REPOSITORY=$repo
+  export GITHUB_TOKEN="\$(gh auth token)"
+  mise exec -- ./bin/symphony ./GITHUB_WORKFLOW.md --port 4040
+
+Open the dashboard:
+  http://127.0.0.1:4040
+EOF

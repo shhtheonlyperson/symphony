@@ -13,7 +13,7 @@ This directory contains the current Elixir/OTP implementation of Symphony, based
 
 ## How it works
 
-1. Polls Linear for candidate work
+1. Polls Linear or GitHub Issues for candidate work
 2. Creates a workspace per issue
 3. Launches Codex in [App Server mode](https://developers.openai.com/codex/app-server/) inside the
    workspace
@@ -30,8 +30,11 @@ Symphony stops the active agent for that issue and cleans up matching workspaces
 
 1. Make sure your codebase is set up to work well with agents: see
    [Harness engineering](https://openai.com/index/harness-engineering/).
-2. Get a new personal token in Linear via Settings → Security & access → Personal API keys, and
-   set it as the `LINEAR_API_KEY` environment variable.
+2. Choose a tracker:
+   - Linear: get a new personal token in Linear via Settings → Security & access → Personal API
+     keys, and set it as the `LINEAR_API_KEY` environment variable.
+   - GitHub Issues: create a GitHub token with issue and pull-request permissions, and set it as
+     `GITHUB_TOKEN`.
 3. Copy this directory's `WORKFLOW.md` to your repo.
 4. Optionally copy the `commit`, `push`, `pull`, `land`, and `linear` skills to your repo.
    - The `linear` skill expects Symphony's `linear_graphql` app-server tool for raw Linear GraphQL
@@ -107,6 +110,54 @@ You are working on a Linear issue {{ issue.identifier }}.
 Title: {{ issue.title }} Body: {{ issue.description }}
 ```
 
+GitHub Issues example:
+
+```md
+---
+tracker:
+  kind: github
+  repo: $GITHUB_REPOSITORY
+  active_states:
+    - codex:ready
+    - codex:running
+    - codex:rework
+  terminal_states:
+    - codex:done
+    - Closed
+workspace:
+  root: ~/code/workspaces
+hooks:
+  after_create: |
+    : "${GITHUB_REPOSITORY:?set GITHUB_REPOSITORY=your-org/your-repo}"
+    git clone "git@github.com:${GITHUB_REPOSITORY}.git" .
+agent:
+  max_concurrent_agents: 2
+  max_turns: 10
+codex:
+  command: codex app-server
+---
+
+You are working on GitHub issue {{ issue.identifier }}.
+
+Title: {{ issue.title }} Body: {{ issue.description }}
+```
+
+Create the configured GitHub labels before running Symphony. The GitHub adapter treats those labels
+as workflow states; `Closed` maps to the issue's native closed state. Set `GITHUB_REPOSITORY` to
+`owner/repo` for the target repo.
+
+You can create or refresh the required labels with:
+
+```bash
+GITHUB_REPOSITORY=your-org/your-repo ./scripts/symphony-github-setup
+```
+
+Or run setup and start the always-on service in one command:
+
+```bash
+GITHUB_REPOSITORY=your-org/your-repo ./scripts/symphony-github-run
+```
+
 Notes:
 
 - If a value is missing, defaults are used.
@@ -127,7 +178,9 @@ Notes:
   `git clone ... .` there, along with any other setup commands you need.
 - If a hook needs `mise exec` inside a freshly cloned workspace, trust the repo config and fetch
   the project dependencies in `hooks.after_create` before invoking `mise` later from other hooks.
-- `tracker.api_key` reads from `LINEAR_API_KEY` when unset or when value is `$LINEAR_API_KEY`.
+- `tracker.api_key` reads from `LINEAR_API_KEY` for Linear, or `GITHUB_TOKEN` / `GH_TOKEN` for
+  GitHub, when unset. GitHub `tracker.repo` reads from `GITHUB_REPOSITORY` when unset. Explicit
+  `$VAR` references are also supported.
 - For path values, `~` is expanded to the home directory.
 - For env-backed path values, use `$VAR`. `workspace.root` resolves `$VAR` before path handling,
   while `codex.command` stays a shell command string and any `$VAR` expansion there happens in the
